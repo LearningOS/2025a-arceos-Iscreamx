@@ -102,6 +102,14 @@ pub mod mem {
     }
 }
 
+/// Miscellaneous operations.
+pub mod misc {
+    define_api! {
+        /// Returns a random u128 value.
+        pub fn get_random() -> u128;
+    }
+}
+
 /// Standard input and output.
 pub mod stdio {
     use core::fmt;

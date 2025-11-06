@@ -167,11 +167,11 @@ pub fn __print_impl(args: core::fmt::Arguments) {
         // synchronize using the lock in axlog, to avoid interleaving
         // with kernel logs
         arceos_api::stdio::ax_console_write_fmt(
-            format_args!("\x1b[32m{}\x1b[0m", args)
+            format_args!("\x1b[32m{}", args)
         ).unwrap();
     } else {
         stdout().lock().write_fmt(
-            format_args!("\x1b[32m{}\x1b[0m", args)
+            format_args!("\x1b[32m{}", args)
         ).unwrap();
     }
 }

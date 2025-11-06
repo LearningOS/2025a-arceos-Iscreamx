@@ -1,5 +1,6 @@
 mod mem;
 mod task;
+mod misc;
 
 cfg_fs! {
     mod fs;
@@ -43,6 +44,7 @@ pub use self::mem::*;
 pub use self::stdio::*;
 pub use self::task::*;
 pub use self::time::*;
+pub use self::misc::*;
 
 pub use axhal::misc::terminate as ax_terminate;
 pub use axio::PollState as AxPollState;
