@@ -165,6 +165,49 @@ impl VfsNodeOps for DirNode {
         }
     }
 
+    fn rename(&self, src_path: &str, dst_path: &str) -> VfsResult {
+        log::debug!("rename at ramfs: {} -> {}", src_path, dst_path);
+
+        let (sname, srest) = split_path(src_path);
+        let (dname, drest) = split_path(dst_path);
+
+        match (srest, drest) {
+            (None, None) => {
+                if sname.is_empty() || sname == "." || sname == ".." {
+                    return Err(VfsError::InvalidInput);
+                }
+                if dname.is_empty() || dname == "." || dname == ".." {
+                    return Err(VfsError::InvalidInput);
+                }
+                if sname == dname {
+                    return Ok(());
+                }
+                let mut children = self.children.write();
+                let node = children.remove(sname).ok_or(VfsError::NotFound)?;
+                if children.contains_key(dname) {
+                    return Err(VfsError::AlreadyExists);
+                }
+                children.insert(dname.into(), node);
+                Ok(())
+            }
+            (Some(sr), Some(dr)) => match (sname, dname) {
+                ("", "") | (".", ".") => self.rename(sr, dr),
+                ("..", "..") => self.parent().ok_or(VfsError::NotFound)?.rename(sr, dr),
+                (sn, dn) if sn == dn => {
+                    let child = self
+                        .children
+                        .read()
+                        .get(sn)
+                        .cloned()
+                        .ok_or(VfsError::NotFound)?;
+                    child.rename(sr, dr)
+                }
+                _ => Err(VfsError::Unsupported),
+            },
+            _ => Err(VfsError::Unsupported),
+        }
+    }
+
     axfs_vfs::impl_vfs_dir_default! {}
 }
 
