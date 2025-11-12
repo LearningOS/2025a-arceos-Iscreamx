@@ -18,7 +18,7 @@ fatfs = ["dep:fatfs"]
 myfs = ["dep:crate_interface"]
 use-ramdisk = []
 
-default = ["devfs", "ramfs", "fatfs", "procfs", "sysfs", "myfs"]
+default = ["devfs", "ramfs", "fatfs", "procfs", "sysfs"]
 
 [dependencies]
 log = "0.4.21"
