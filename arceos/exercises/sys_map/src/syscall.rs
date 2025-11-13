@@ -9,6 +9,9 @@ use axtask::TaskExtRef;
 use axhal::paging::MappingFlags;
 use arceos_posix_api as api;
 
+use axhal::mem::phys_to_virt;  
+use memory_addr::{VirtAddr, VirtAddrRange, align_up_4k}; 
+
 const SYS_IOCTL: usize = 29;
 const SYS_OPENAT: usize = 56;
 const SYS_CLOSE: usize = 57;
@@ -139,8 +142,54 @@ fn sys_mmap(
     flags: i32,
     fd: i32,
     _offset: isize,
-) -> isize {
-    unimplemented!("no sys_mmap!");
+) -> isize { 
+    let prot = MmapProt::from_bits(prot).unwrap_or(MmapProt::empty());  
+    let flags = MmapFlags::from_bits(flags).unwrap_or(MmapFlags::empty());  
+    let mapping_flags = MappingFlags::from(prot);  
+      
+    let aligned_length = align_up_4k(length);  
+      
+    let curr = current();  
+    let mut aspace = curr.task_ext().aspace.lock();  
+      
+    let map_addr = if addr.is_null() {  
+        let limit = VirtAddrRange::from_start_size(aspace.base(), aspace.size());  
+        match aspace.find_free_area(aspace.base(), aligned_length, limit) {  
+            Some(va) => va,  
+            None => return -LinuxError::ENOMEM.code() as isize,  
+        }  
+    } else {  
+        VirtAddr::from(addr as usize)  
+    };  
+      
+    if let Err(_) = aspace.map_alloc(map_addr, aligned_length, mapping_flags, true) {  
+        return -LinuxError::ENOMEM.code() as isize;  
+    }  
+      
+    if !flags.contains(MmapFlags::MAP_ANONYMOUS) && fd >= 0 {  
+        let (paddr, _, _) = aspace  
+            .page_table()  
+            .query(map_addr)  
+            .unwrap_or_else(|_| panic!("Mapping failed for mmap: {:#x}", map_addr));  
+          
+        let mut buf = alloc::vec![0u8; length];  
+        let read_size = api::sys_read(fd, buf.as_mut_ptr() as *mut c_void, length);  
+          
+        if read_size < 0 {  
+            let _ = aspace.unmap(map_addr, aligned_length);  
+            return read_size;  
+        }  
+          
+        unsafe {  
+            core::ptr::copy_nonoverlapping(  
+                buf.as_ptr(),  
+                phys_to_virt(paddr).as_mut_ptr(),  
+                read_size as usize,  
+            );  
+        }  
+    }  
+      
+    map_addr.as_usize() as isize 
 }
 
 fn sys_openat(dfd: c_int, fname: *const c_char, flags: c_int, mode: api::ctypes::mode_t) -> isize {
